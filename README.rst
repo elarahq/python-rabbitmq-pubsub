@@ -2,8 +2,7 @@ This is rabbitmq receiver that implements a safe and reliable rabbitmq listener.
 
 Name of the package is rmqreceiver. It has a Receiver class which can be imported to implement a rabbitmq consumer. This class provides a lot of fucntions for tasks like: to make connection to rabbitmq server, to change configuration of exchange and queue binding, to start listing the messages, to safely stop the connection.
 
-Documentation of the rabbitmq receiver is available at: 
-http://rahulkumar.housing.com:8034/docs/_build/html/common.html#module-common.rabbitmq_receiver
+For documentation one can refer to the code in file rmqreceiver/rabbitmq_receiver.py
 
 Here is the list of parameters (including optional params) to be passed on initializing Receiver class:
 
