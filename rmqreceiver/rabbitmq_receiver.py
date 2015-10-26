@@ -386,8 +386,7 @@ class Receiver(object):
 
     def signal_term_handler(self, signal, frame):
         """This function executes when the signal mentioned in signal variable is 
-                raised. It stops the channel and connecection etc. when called on 
-                a signal.
+        raised. It stops the channel and connecection etc. when called on a signal.
 
         :param signal signal: The signal number
         :param Frame frame: The Frame object

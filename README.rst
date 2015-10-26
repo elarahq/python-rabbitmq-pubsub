@@ -55,4 +55,4 @@ Here is the sample code to use the rabbitmq receiver::
         my_receiver.run()
 
     if __name__ == '__main__':
-            main()
+        main()
