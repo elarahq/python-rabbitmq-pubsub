@@ -7,7 +7,7 @@ import logging
 class Receiver(object):
 
     """
-    This is RabbitMQ receiver that handles unexpected interactions
+    RabbitMQ receiver that handles unexpected interactions
     with RabbitMQ such as channel and connection closures.
 
     If RabbitMQ closes the connection, it will reopen it. 
@@ -65,9 +65,9 @@ class Receiver(object):
         self.parse_input_args(kwargs)
 
     def parse_input_args(self, kwargs):
-        """This method parses input parameter values from a dictionary. Class attributes are 
-        assigned values as per given in the dictionary. The attributes which are not there 
-        the dictionary are assigned default values
+        """Parse and set connection parameters from a dictionary.
+        
+        Assigns defaults for missing parameters.
         """
         self.exchange_type = kwargs.get('exchange_type')
         self.queue = kwargs.get('queue', '')
@@ -84,12 +84,13 @@ class Receiver(object):
             self.queue_exclusive = True
 
     def connect(self):
-        """This method connects to RabbitMQ, returning the connection handle.
+        """Connect to RabbitMQ, returning the connection handle.
+        
         When the connection is established, the on_connection_open method
         will be invoked by pika.
 
         :rtype: pika.SelectConnection
-
+        
         """
         self._LOGGER.info('Connecting to %s', self._url)
         return pika.SelectConnection(pika.URLParameters(self._url),
@@ -97,29 +98,32 @@ class Receiver(object):
                                      stop_ioloop_on_close=False)
 
     def on_connection_open(self, unused_connection):
-        """This method is called by pika once the connection to RabbitMQ has
-        been established. It passes the handle to the connection object in
+        """Invoked by pika once the connection to RabbitMQ has
+        been established.
+        
+        It passes the handle to the connection object in
         case we need it, but in this case, we'll just mark it unused.
 
         :type unused_connection: pika.SelectConnection
-
+        
         """
         self._LOGGER.info('Connection opened')
         self.add_on_connection_close_callback()
         self.open_channel()
 
     def add_on_connection_close_callback(self):
-        """This method adds an on close callback that will be invoked by pika
-        when RabbitMQ closes the connection to the publisher unexpectedly.
-
+        """Add a callback that will be invoked if RabbitMQ closes the connection
+        for some reason. If RabbitMQ does close the connection, on_connection_closed
+        will be invoked by pika.
+        
         """
         self._LOGGER.info('Adding connection close callback')
         self._connection.add_on_close_callback(self.on_connection_closed)
 
     def on_connection_closed(self, connection, reply_code, reply_text):
-        """This method is invoked by pika when the connection to RabbitMQ is
-        closed unexpectedly. Since it is unexpected, we will reconnect to
-        RabbitMQ if it disconnects.
+        """Invoked by pika when the connection to RabbitMQ is closed unexpectedly.
+        
+        Since it is unexpected, we will reconnect to RabbitMQ if it disconnects.
 
         :param pika.connection.Connection connection: The closed connection obj
         :param int reply_code: The server provided reply_code if given
@@ -135,8 +139,10 @@ class Receiver(object):
             self._connection.add_timeout(5, self.reconnect)
 
     def reconnect(self):
-        """Will be invoked by the IOLoop timer if the connection is
-        closed. See the on_connection_closed method.
+        """Invoked by the IOLoop timer if the connection is
+        closed.
+        
+        See the on_connection_closed method.
 
         """
         # This is the old connection IOLoop instance, stop its ioloop
@@ -150,7 +156,9 @@ class Receiver(object):
 
     def open_channel(self):
         """Open a new channel with RabbitMQ by issuing the Channel.Open RPC
-        command. When RabbitMQ responds that the channel is open, the
+        command.
+        
+        When RabbitMQ responds that the channel is open, the
         on_channel_open callback will be invoked by pika.
 
         """
@@ -158,7 +166,7 @@ class Receiver(object):
         self._connection.channel(on_open_callback=self.on_channel_open)
 
     def on_channel_open(self, channel):
-        """This method is invoked by pika when the channel has been opened.
+        """Invoked by pika when the channel has been opened.
         The channel object is passed in so we can make use of it.
 
         Since the channel is now open, we'll declare the exchange to use.
@@ -177,8 +185,11 @@ class Receiver(object):
             self.setup_queue(self.queue)
 
     def add_on_channel_close_callback(self):
-        """This method tells pika to call the on_channel_closed method if
-        RabbitMQ unexpectedly closes the channel.
+        """Add a callback that will be invoked if RabbitMQ closes the channel
+        for some reason.
+        
+        If RabbitMQ does close the channel, on_channel_closed  will be invoked
+        by pika.
 
         """
         self._LOGGER.info('Adding channel close callback')
@@ -186,6 +197,7 @@ class Receiver(object):
 
     def on_channel_closed(self, channel, reply_code, reply_text):
         """Invoked by pika when RabbitMQ unexpectedly closes the channel.
+        
         Channels are usually closed if we attempt to do something that
         violates the protocol, such as re-declare an exchange or queue with
         different parameters. In this case, we'll close the connection
@@ -202,8 +214,9 @@ class Receiver(object):
 
     def setup_exchange(self, exchange_name):
         """Setup the exchange on RabbitMQ by invoking the Exchange.Declare RPC
-        command. When it is complete, the on_exchange_declareok method will
-        be invoked by pika.
+        command.
+        
+        When it is complete, the on_exchange_declareok method will be invoked by pika.
 
         :param str|unicode exchange_name: The name of the exchange to declare
 
@@ -225,8 +238,9 @@ class Receiver(object):
 
     def setup_queue(self, queue_name):
         """Setup the queue on RabbitMQ by invoking the Queue.Declare RPC
-        command. When it is complete, the on_queue_declareok method will
-        be invoked by pika.
+        command.
+        
+        When it is complete, the on_queue_declareok method will be invoked by pika.
 
         Please note that if there already exist a queue with the queue name you 
         have given but different parameters (i.e. queue_durable, queue_exclusive 
@@ -245,11 +259,12 @@ class Receiver(object):
                                     durable=self.queue_durable, exclusive=self.queue_exclusive)
 
     def on_queue_declareok(self, method_frame):
-        """Method invoked by pika when the Queue.Declare RPC call made in
-        setup_queue has completed. In this method we will bind the queue
-        and exchange together with the routing key by issuing the Queue.Bind
-        RPC command. When this command is complete, the on_bindok method will
-        be invoked by pika.
+        """Invoked by pika when the Queue.Declare RPC call made in
+        setup_queue has completed.
+        
+        In this method we will bind the queue and exchange together with the
+        routing key by issuing the Queue.Bind RPC command. When this command
+        is complete, the on_bindok method will be invoked by pika.
 
         :param pika.frame.Method method_frame: The Queue.DeclareOk frame
 
@@ -266,8 +281,9 @@ class Receiver(object):
                                      self.exchange, binding_key)
 
     def on_bindok(self, unused_frame):
-        """Invoked by pika when the Queue.Bind method has completed. At this
-        point we will start consuming messages by calling start_consuming
+        """Invoked by pika when the Queue.Bind method has completed.
+        
+        At this point we will start consuming messages by calling start_consuming
         which will invoke the needed RPC commands to start the process.
 
         :param pika.frame.Method unused_frame: The Queue.BindOk response frame
@@ -279,8 +295,9 @@ class Receiver(object):
             self.start_consuming()
 
     def start_consuming(self):
-        """This method sets up the consumer by first calling
-        add_on_cancel_callback so that the object is notified if RabbitMQ
+        """Set up the consumer.
+        
+        Calls add_on_cancel_callback so that the object is notified if RabbitMQ
         cancels the consumer. It then issues the Basic.Consume RPC command
         which returns the consumer tag that is used to uniquely identify the
         consumer with RabbitMQ. We keep the value to use it when we want to
@@ -354,10 +371,11 @@ class Receiver(object):
             self._channel.basic_cancel(self.on_cancelok, self._consumer_tag)
 
     def on_cancelok(self, unused_frame):
-        """This method is invoked by pika when RabbitMQ acknowledges the
-        cancellation of a consumer. At this point we will close the channel.
-        This will invoke the on_channel_closed method once the channel has been
-        closed, which will in-turn close the connection.
+        """Invoked by pika when RabbitMQ acknowledges the cancellation of a consumer.
+        
+        At this point we will close the channel. This will invoke the
+        on_channel_closed method once the channel has been closed, which will
+        in-turn close the connection.
 
         :param pika.frame.Method unused_frame: The Basic.CancelOk frame
 
@@ -367,7 +385,7 @@ class Receiver(object):
         self.close_channel()
 
     def close_channel(self):
-        """Call to close the channel with RabbitMQ cleanly by issuing the
+        """Close the channel with RabbitMQ cleanly by issuing the
         Channel.Close RPC command.
 
         """
@@ -385,7 +403,7 @@ class Receiver(object):
         self._connection.ioloop.start()
 
     def signal_term_handler(self, signal, frame):
-        """This function executes when the signal mentioned in signal variable is 
+        """Invoked when the signal mentioned in signal variable is 
         raised. It stops the channel and connecection etc. when called on a signal.
 
         :param signal signal: The signal number
@@ -401,9 +419,11 @@ class Receiver(object):
 
     def stop(self):
         """Cleanly shutdown the connection to RabbitMQ by stopping the consumer
-        with RabbitMQ. When RabbitMQ confirms the cancellation, on_cancelok
-        will be invoked by pika, which will then closing the channel and
-        connection. If any eception occurs IOLoop stops but IOLoop needs to 
+        with RabbitMQ.
+        
+        When RabbitMQ confirms the cancellation, on_cancelok
+        will be invoked by pika, which will then close the channel and
+        connection. If any exception occurs IOLoop stops but IOLoop needs to 
         be running for pika to communicate with RabbitMQ. So the IOLoop is 
         started again. All of the commands issued prior to starting
         the IOLoop will be buffered but not processed.
@@ -416,6 +436,6 @@ class Receiver(object):
         self._LOGGER.info('Stopped')
 
     def close_connection(self):
-        """This method closes the connection to RabbitMQ."""
+        """Close the connection to RabbitMQ."""
         self._LOGGER.info('Closing connection')
         self._connection.close()
