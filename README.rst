@@ -1,7 +1,24 @@
-This is rabbitmq receiver that implements a safe and reliable rabbitmq listener. Latest version of package is 0.1
+==========================
+Python RabbitMQ Receiver
+==========================
 
-Name of the package is rmqreceiver. It has a Receiver class which can be imported to implement a rabbitmq consumer. This class provides a lot of fucntions for tasks like: to make connection to rabbitmq server, to change configuration of exchange and queue binding, to start listing the messages, to safely stop the connection.
+A rabbitmq receiver that implements a safe and reliable rabbitmq listener.
 
+Changelog
+=========
+
+0.1
+---
+
+* Wrote a basic RabbitMQ Receiver
+
+Description
+===========
+
+Name of the package is rmqreceiver. It has a Receiver class which can be imported to implement a rabbitmq consumer. This class contains a lot of functions for tasks like: to make connection to rabbitmq server, to change configuration of exchange and queue binding, to start listing the messages, to safely stop the connection. SelectConnection is being used by Receiver class for its asynchronous design.
+
+Installation
+============
 To install the latest version of the package, user can use the command:
     pip install git+https://github.com/loconsolutions/python.rabbitmq.receiver.git
 
@@ -11,15 +28,20 @@ To install a specific version x.x use the following command:
 for example to install version 0.1 command to be used will be:
     pip install git+https://github.com/loconsolutions/python.rabbitmq.receiver.git@version_0.1
 
+
+Usage
+=====
+
 For documentation one can refer to the code in file rmqreceiver/rabbitmq_receiver.py
 
-Here is the list of parameters (including optional params) to be passed on initializing Receiver class:
+Import the receiver class and based on what behaviour you want from the RabbitMQ listner, pass the parameter values during initalizing the class. Here is the list of parameters (including optional params) to be passed on initializing Receiver class:
 
     :param method consumer_callback: The method to callback when consuming (messages)
-                with the signature consumer_callback(channel, method, properties, body), where
-                                    channel: pika.Channel
-                                    method: pika.spec.Basic.Deliver
-                                    properties: pika.spec.BasicProperties
+            with the signature consumer_callback(channel, method, properties, body), where
+            
+                                    channel: pika.Channel,
+                                    method: pika.spec.Basic.Deliver,
+                                    properties: pika.spec.BasicProperties,
                                     body: str, unicode, or bytes (python 3.x)
     :param str amqp_url: The AMQP url to connect with
     :param str exchange: Name of exchange
@@ -44,23 +66,38 @@ Here is the list of parameters (including optional params) to be passed on initi
     :param bool safe_stop: If this option is True, system will try to gracefully stop the 
             connection if the process is killed (with SIGTERM signal). Its default value is True
 
+Use run() function to start the RabbitMQ listener. It will then keep on consuming the messages. Use stop() function to stop the listner whenever you want. Logging of all the events is already added in the class.
 
+Example
+=======
 
-Here is the sample code to use the rabbitmq receiver::
+Here is the sample code to use the rabbitmq receiver.
+
+.. code:: python
 
     from rmqreceiver import Receiver
     def consumer_callback(unused_channel, basic_deliver, properties, body):
         #do something.
-        pass
+        print "The message received is: %s" % body
 
     def main():
-        url = 'amqp://guest:guest@127.0.0.1:5672/%2F'
-        exchange = 'something.something'
-        exchange_type = 'topic'
-        binding_key = 'something.something.*'
-        queue_name='my_queue'
-        my_receiver = Receiver(consumer_callback, url, exchange, binding_keys=[binding_key], queue=queue_name, queue_durable=True, queue_exclusive=False)
-        my_receiver.run()
+        try:
+            url = 'amqp://guest:guest@127.0.0.1:5672/%2F'
+            exchange = 'something.something'
+            exchange_type = 'topic'
+            binding_key = 'something.something.*'
+            queue_name='my_queue'
+            my_receiver = Receiver(consumer_callback, url, exchange, 
+                            binding_keys=[binding_key], queue=queue_name, 
+                            queue_durable=True, queue_exclusive=False)
+            # Since we haven't passed the exchange_type, it will connect to
+            # existing exchange instead of initializing a new one on its own
+            my_receiver.run()
+            # Since safe_stop option is True (by default), when a kill 
+            # process signal is raised my_receiver.stop() function will be 
+            # automatically called before the process ends
+        except KeyboardInterrupt:
+            my_receiver.stop()
 
     if __name__ == '__main__':
         main()
