@@ -7,6 +7,11 @@ A rabbitmq receiver that implements a safe and reliable rabbitmq listener.
 Changelog
 =========
 
+0.1.1
+-----
+
+* Logging of message body changed to DEBUG mode instead of INFO
+
 0.1
 ---
 
