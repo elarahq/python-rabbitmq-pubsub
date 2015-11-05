@@ -61,7 +61,6 @@ class Receiver(object):
         self.consumer_callback = consumer_callback
         self._url = amqp_url
         self.exchange = exchange
-        self.keys_bound_to_queue = 0
         self.parse_input_args(kwargs)
 
     def parse_input_args(self, kwargs):
@@ -276,6 +275,7 @@ class Receiver(object):
         else:
             self._LOGGER.info('Binding %s to %s with %s',
                               self.exchange, self.queue, ','.join(self.binding_keys))
+        self.keys_bound_to_queue = 0
         for binding_key in self.binding_keys:
             self._channel.queue_bind(self.on_bindok, self.queue,
                                      self.exchange, binding_key)
