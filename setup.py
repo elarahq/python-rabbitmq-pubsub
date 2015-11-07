@@ -6,7 +6,7 @@ def readme():
         return f.read()
 
 setup(name='rmqreceiver',
-      version='0.1.1',
+      version='0.1.2',
       description='Rabbitmq Receiver',
       url='https://github.com/loconsolutions/python.rabbitmq.receiver',
       author='Rahul Kumar',
