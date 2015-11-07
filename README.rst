@@ -7,6 +7,11 @@ A rabbitmq receiver that implements a safe and reliable rabbitmq listener.
 Changelog
 =========
 
+0.1.2
+-----
+
+* Reconnecting bug fix. Applies to all the branch.
+
 0.1.1
 -----
 
