@@ -43,7 +43,7 @@ class Publisher(object):
         """
         self._connection = None
         self._channel = None
-        self._deliveries = []
+        self._messages = {}
         self._acked = 0
         self._nacked = 0
         self._message_number = 0
@@ -60,6 +60,9 @@ class Publisher(object):
         Assigns defaults for missing parameters.
         """
         self.exchange_type = kwargs.get('exchange_type', 'topic')
+        self.exchange_durable = kwargs.get('exchange_durable', True)
+        self.exchange_auto_delete = kwargs.get('exchange_auto_delete', False)
+        self.exchange_internal = kwargs.get('exchange_internal', False)
         self.nack_callback = kwargs.get('nack_callback')
         self.delivery_confirmation = kwargs.get('delivery_confirmation', True)
         # self.queue_exclusive = kwargs.get('queue_exclusive', False)
@@ -131,7 +134,8 @@ class Publisher(object):
         closed. See the on_connection_closed method.
 
         """
-        self._deliveries = []
+        # Should we write messages to some file before refreshing?
+        self._messages = {}
         self._acked = 0
         self._nacked = 0
         self._message_number = 0
@@ -202,9 +206,10 @@ class Publisher(object):
 
         """
         LOGGER.info('Declaring exchange %s', exchange_name)
-        self._channel.exchange_declare(self.on_exchange_declareok,
-                                       exchange_name,
-                                       self.exchange_type)
+        self._channel.exchange_declare(self.on_exchange_declareok, exchange_name,
+                                       self.exchange_type, durable=self.exchange_durable,
+                                       auto_delete=self.exchange_auto_delete,
+                                       internal=self.exchange_internal)
 
     def on_exchange_declareok(self, unused_frame):
         """Invoked by pika when RabbitMQ has finished the Exchange.Declare RPC
@@ -298,12 +303,16 @@ class Publisher(object):
             self._nacked += 1
             if self.nack_callback:
                 self.nack_callback(
-                    self._deliveries[method_frame.method.delivery_tag])
-        self._deliveries.remove(method_frame.method.delivery_tag)
-        print method_frame.method.delivery_tag
+                    self._messages[method_frame.method.delivery_tag])
+        try:
+            del self._messages[method_frame.method.delivery_tag]
+        except KeyError:
+            LOGGER.warning(
+                "The message to delete after confirmation not present in dictionary")
+        print self._messages[method_frame.method.delivery_tag]
         LOGGER.info('Published %i messages, %i have yet to be confirmed, '
                     '%i were acked and %i were nacked',
-                    self._message_number, len(self._deliveries),
+                    self._message_number, len(self._messages),
                     self._acked, self._nacked)
         self._connection.ioloop.stop()
 
@@ -345,7 +354,7 @@ class Publisher(object):
         self._channel.basic_publish(self.exchange, routing_key,
                                     message)
         self._message_number += 1
-        self._deliveries.append(self._message_number)
+        self._messages[self._message_number] = message
         LOGGER.info('Published message # %i', self._message_number)
         # self.schedule_next_message()
         self._connection.ioloop.start()
@@ -405,7 +414,7 @@ def main():
             count += 1
             example.publish_message(
                 "message number {num}".format(num=count), 'example.txt')
-            time.sleep(30)
+            time.sleep(3)
         # example.publish_message("message number 1", 'example.txt')
         # example.publish_message("message number 2", 'example.txt')
     except KeyboardInterrupt:
