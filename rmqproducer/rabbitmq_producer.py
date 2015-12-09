@@ -21,13 +21,8 @@ class Publisher(object):
     """
 
     def __init__(self, amqp_url):
-        """Create a new instance of the Publisher class, passing in the various
+        """Create a new instance of the Publisher class, passing in the
         parameters used to connect to RabbitMQ.
-
-        Other than amqp_url and exchange the optional arguments are: 
-        exchange_type, exchange_durable, exchange_auto_delete, exchange_internal, 
-        delivery_confirmation, nack_callback, safe_stop
-
 
         :param str amqp_url: The AMQP url to connect with
 
@@ -45,6 +40,7 @@ class Publisher(object):
 
         Assigns defaults for missing parameters.
         """
+        self.exchange = kwargs.get('exchange', 'default_exchange')
         self.exchange_type = kwargs.get('exchange_type', 'topic')
         self.exchange_durable = kwargs.get('exchange_durable', True)
         self.exchange_auto_delete = kwargs.get('exchange_auto_delete', False)
@@ -65,9 +61,9 @@ class Publisher(object):
 
         """
         self._LOGGER.info('Connecting to %s', self._url)
-        return pika.SelectConnection(pika.URLParameters(self._url),
-                                     self.on_connection_open,
-                                     stop_ioloop_on_close=False)
+        self._connection = pika.SelectConnection(pika.URLParameters(self._url),
+                                                 self.on_connection_open,
+                                                 stop_ioloop_on_close=False)
 
     def on_connection_open(self, unused_connection):
         """This method is called by pika once the connection to RabbitMQ has
@@ -290,10 +286,12 @@ class Publisher(object):
         if self._channel:
             self._channel.close()
 
-    def run(self, connection, **kwargs):
+    def run(self, **kwargs):
         """Run the example code by connecting and then starting the IOLoop.
+        The optional arguments are: 
+        exchange_type, exchange_durable, exchange_auto_delete, exchange_internal, 
+        delivery_confirmation, nack_callback, safe_stop
 
-        :param connection: RMQ connection object
         :param str exchange: Name of exchange
         :param str exchange_type: The exchange type to use. It's default value 
                 is topic
@@ -316,10 +314,9 @@ class Publisher(object):
                 SIGTERM signal). Its default value is True
 
         """
+        self.parse_input_args(kwargs)
         if self.safe_stop:
             signal.signal(signal.SIGTERM, self.signal_term_handler)
-        self._connection = connection
-        self.parse_input_args(kwargs)
         self._connection.ioloop.start()
 
     def signal_term_handler(self, signal, frame):
