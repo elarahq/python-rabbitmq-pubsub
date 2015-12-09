@@ -20,7 +20,7 @@ class Publisher(object):
 
     """
 
-    def __init__(self, amqp_url, exchange, **kwargs):
+    def __init__(self, amqp_url):
         """Create a new instance of the Publisher class, passing in the various
         parameters used to connect to RabbitMQ.
 
@@ -30,26 +30,6 @@ class Publisher(object):
 
 
         :param str amqp_url: The AMQP url to connect with
-        :param str exchange: Name of exchange
-        :param str exchange_type: The exchange type to use. It's default value 
-                is topic
-        :param bool exchange_durable: Survive a reboot of RabbitMQ. This is the 
-                durable flag used in exchange_declare() function of pika channel. 
-                It's default value is True
-        :param bool exchange_auto_delete: Remove when no more queues are bound 
-                to it. This is the auto_delete flag used in exchange_declare() 
-                function of pika channel. It's default value is False
-        :param bool exchange_internal: Can only be published to by other 
-                exchanges. This is the internal flag used in exchange_declare() 
-                function of pika channel. It's default value is False
-        :param bool delivery_confirmation: If the confirmation of published 
-                message is required. It's default value is True.
-        :param method nack_callback: The method to callback when publishing of 
-                a message fails. Signature of the method: nack_callback(failed_message) 
-                where failed_message is the message which failed
-        :param bool safe_stop: If this option is True, system will try to 
-                gracefully stop the connection if the process is killed (with 
-                SIGTERM signal). Its default value is True
 
         """
         self._connection = None
@@ -59,8 +39,6 @@ class Publisher(object):
         self._closing = False
         self._LOGGER = logging.getLogger(__name__)
         self._url = amqp_url
-        self.exchange = exchange
-        self.parse_input_args(kwargs)
 
     def parse_input_args(self, kwargs):
         """Parse and set connection parameters from a dictionary.
@@ -312,13 +290,36 @@ class Publisher(object):
         if self._channel:
             self._channel.close()
 
-    def run(self):
+    def run(self, connection, **kwargs):
         """Run the example code by connecting and then starting the IOLoop.
+
+        :param connection: RMQ connection object
+        :param str exchange: Name of exchange
+        :param str exchange_type: The exchange type to use. It's default value 
+                is topic
+        :param bool exchange_durable: Survive a reboot of RabbitMQ. This is the 
+                durable flag used in exchange_declare() function of pika channel. 
+                It's default value is True
+        :param bool exchange_auto_delete: Remove when no more queues are bound 
+                to it. This is the auto_delete flag used in exchange_declare() 
+                function of pika channel. It's default value is False
+        :param bool exchange_internal: Can only be published to by other 
+                exchanges. This is the internal flag used in exchange_declare() 
+                function of pika channel. It's default value is False
+        :param bool delivery_confirmation: If the confirmation of published 
+                message is required. It's default value is True.
+        :param method nack_callback: The method to callback when publishing of 
+                a message fails. Signature of the method: nack_callback(failed_message) 
+                where failed_message is the message which failed
+        :param bool safe_stop: If this option is True, system will try to 
+                gracefully stop the connection if the process is killed (with 
+                SIGTERM signal). Its default value is True
 
         """
         if self.safe_stop:
             signal.signal(signal.SIGTERM, self.signal_term_handler)
-        self._connection = self.connect()
+        self._connection = connection
+        self.parse_input_args(kwargs)
         self._connection.ioloop.start()
 
     def signal_term_handler(self, signal, frame):
