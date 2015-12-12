@@ -1,7 +1,4 @@
-from rabbitmq_producer import Publisher
-
-
-class RMQCoonectionPool(object):
+class RMQConnectionPool(object):
     """This is Connection Pool from which user can take/put a conncetion
 
     """
@@ -18,9 +15,18 @@ class RMQCoonectionPool(object):
 
         """
         connection_identifier = amqp_url
-        publisher_object = cls.connection_pools.get(connection_identifier)
-        if publisher_object is None:
-            publisher_object = Publisher(amqp_url)
-            publisher_object.connect()
-            cls.connection_pools[connection_identifier] = publisher_object
-        return publisher_object
+        connection_object = cls.connection_pools.get(connection_identifier)
+        return connection_object
+
+    @classmethod
+    def put_connection(cls, connection_identifier, connection_object):
+        """This method is used to put the new connection in the connection pool.
+        This is invoked when the connection is not available for that identifier.
+        """
+        cls.connection_pools[connection_identifier] = connection_object
+
+    @classmethod
+    def remove_connection(cls, connection_identifier):
+        """This method removes the connection from the pool for the given identifier.
+        """
+        cls.connection_pools.pop(connection_identifier)
