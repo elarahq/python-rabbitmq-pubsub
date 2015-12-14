@@ -4,8 +4,6 @@ import signal
 import logging
 from connection import RMQConnectionPool
 
-RECONNECT_TIME = 5
-
 
 class Publisher(object):
     """This is a safe and robust publisher that will handle unexpected interactions
@@ -21,7 +19,7 @@ class Publisher(object):
 
     """
 
-    def __init__(self, amqp_url, **kwargs):
+    def __init__(self, amqp_url, exchange, **kwargs):
         """Create a new instance of the Publisher class, passing in the
         parameters used to connect to RabbitMQ. It established connection and 
         created corresponding channel with defined exchange.
@@ -61,8 +59,9 @@ class Publisher(object):
         self._connection_closing = False
         self._LOGGER = logging.getLogger(__name__)
         self._url = amqp_url
-        self.connect()
+        self.exchange = exchange
         self.parse_input_args(kwargs)
+        self.connect()
         self.run()
 
     def parse_input_args(self, kwargs):
@@ -70,7 +69,6 @@ class Publisher(object):
 
         Assigns defaults for missing parameters.
         """
-        self.exchange = kwargs.get('exchange', 'default_exchange')
         self.exchange_type = kwargs.get('exchange_type', 'topic')
         self.exchange_durable = kwargs.get('exchange_durable', True)
         self.exchange_auto_delete = kwargs.get('exchange_auto_delete', False)
@@ -78,6 +76,7 @@ class Publisher(object):
         self.delivery_confirmation = kwargs.get('delivery_confirmation', True)
         self.nack_callback = kwargs.get('nack_callback')
         self.safe_stop = kwargs.get('safe_stop', True)
+        self.reconnect_time = kwargs.get('reconnect_time', 5)
 
     def connect(self):
         """This method connects to RabbitMQ, returning the connection handle.
@@ -94,11 +93,12 @@ class Publisher(object):
         connection = RMQConnectionPool.get_connection(self._url)
         if connection is None:
             connection = pika.SelectConnection(pika.URLParameters(self._url),
-                                                     self.on_connection_open,
-                                                     stop_ioloop_on_close=False)
+                                               self.on_connection_open,
+                                               stop_ioloop_on_close=False)
             RMQConnectionPool.put_connection(self._url, connection)
             self._connection = connection
         else:
+            self._LOGGER.info('Connection received from connection pool')
             self._connection = connection
             self.add_on_connection_close_callback()
             self.open_channel()
@@ -139,27 +139,36 @@ class Publisher(object):
         if self._connection_closing:
             self._LOGGER.info('Connection was closed: (%s) %s',
                               reply_code, reply_text)
+            self._connection.ioloop.stop()
         else:
             self._LOGGER.warning('Connection closed, reopening in %d seconds: (%s) %s',
-                                 RECONNECT_TIME, reply_code, reply_text)
-            self._connection.add_timeout(RECONNECT_TIME, self.reconnect)
+                                 self.reconnect_time, reply_code, reply_text)
+            self._connection.add_timeout(self.reconnect_time, self.reconnect)
 
     def reconnect(self):
         """Will be invoked by the IOLoop timer if the connection is
         closed. See the on_connection_closed method.
 
         """
-        self._messages = {}
-        self._message_number = 0
+        self.reset_messages()
 
         # This is the old connection IOLoop instance, stop its ioloop
         self._connection.ioloop.stop()
+        RMQConnectionPool.remove_connection(self._url)
 
         # Create a new connection
-        self._connection = self.connect()
+        self.connect()
 
         # There is now a new connection, needs a new ioloop to run
         self._connection.ioloop.start()
+
+    def reset_messages(self):
+        if len(self._messages) != 0:
+            self._LOGGER.error(
+                'These %d messages could not be published due to restarting of connection: %s',
+                len(self._messages), str(self._messages))
+        self._messages = {}
+        self._message_number = 0
 
     def open_channel(self):
         """This method will open a new channel with RabbitMQ by issuing the
@@ -207,8 +216,9 @@ class Publisher(object):
 
         """
         self._LOGGER.info('Channel was closed: (%s) %s',
-                             reply_code, reply_text)
+                          reply_code, reply_text)
         if not self._channel_closing:
+            self.reset_messages()
             self.open_channel()
 
     def setup_exchange(self, exchange_name):
@@ -277,9 +287,8 @@ class Publisher(object):
         confirmation_type = method_frame.method.NAME.split('.')[1].lower()
         message_num = method_frame.method.delivery_tag
         if confirmation_type == 'ack':
-            self._LOGGER.info('Message %i published successfully,'
-                              'confirmation pending for %i messages',
-                              message_num, (len(self._messages) - 1))
+            self._LOGGER.info('Message %i published successfully',
+                              message_num)
             self._LOGGER.debug('The message published: %s',
                                self._messages[message_num])
         if confirmation_type == 'nack':
@@ -308,7 +317,7 @@ class Publisher(object):
             self._LOGGER.error(
                 "Following message couldn't be published: %s", message)
             return
-        item = self._channel.basic_publish(self.exchange, routing_key, message)
+        self._channel.basic_publish(self.exchange, routing_key, message)
         self._message_number += 1
         self._messages[self._message_number] = message
         self._LOGGER.debug('Publishing message # %i', self._message_number)
@@ -325,13 +334,12 @@ class Publisher(object):
 
     def run(self, **kwargs):
         """Run the example code by connecting and then starting the IOLoop.
-        
+
 
         """
         if self.safe_stop:
             signal.signal(signal.SIGTERM, self.signal_term_handler)
         self._connection.ioloop.start()
-
 
     def signal_term_handler(self, signal, frame):
         """Invoked when the signal mentioned in signal variable is
@@ -348,18 +356,16 @@ class Publisher(object):
                 "Could not gracefully stop connection on raised signal: " + str(e))
         sys.exit(0)
 
-    def stop_channel(self):
+    def close_channel(self):
         """Stop the publisher by closing the channel and connection. 
 
         Starting the IOLoop again will allow the publisher to cleanly
         disconnect from RabbitMQ.
 
         """
-        self._LOGGER.info('Stopping')
+        self._LOGGER.info('Closing Channel')
         self._channel_closing = True
         self.close_channel()
-        self._connection.ioloop.stop()
-        self._LOGGER.info('Stopped')
 
     def close_connection(self):
         """This method closes the connection to RabbitMQ."""
