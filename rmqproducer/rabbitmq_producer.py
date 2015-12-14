@@ -99,6 +99,7 @@ class Publisher(object):
             self._connection = connection
         else:
             self._connection = connection
+            self.add_on_connection_close_callback()
             self.open_channel()
 
     def on_connection_open(self, unused_connection):
