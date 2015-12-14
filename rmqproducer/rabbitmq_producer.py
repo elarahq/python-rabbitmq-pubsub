@@ -93,8 +93,8 @@ class Publisher(object):
         connection = RMQConnectionPool.get_connection(self._url)
         if connection is None:
             connection = pika.SelectConnection(pika.URLParameters(self._url),
-                                               self.on_connection_open,
-                                               stop_ioloop_on_close=False)
+                                                self.on_connection_open,
+                                                stop_ioloop_on_close=False)
             RMQConnectionPool.put_connection(self._url, connection)
             self._connection = connection
         else:
@@ -150,6 +150,7 @@ class Publisher(object):
         closed. See the on_connection_closed method.
 
         """
+        self._LOGGER.info("Reconnecting to the server")
         self.reset_messages()
 
         # This is the old connection IOLoop instance, stop its ioloop
@@ -317,7 +318,9 @@ class Publisher(object):
             self._LOGGER.error(
                 "Following message couldn't be published: %s", message)
             return
-        self._channel.basic_publish(self.exchange, routing_key, message)
+        self._channel.basic_publish(self.exchange, routing_key, message, properties=pika.BasicProperties(
+                         delivery_mode = 2, # make message persistent
+                      ))
         self._message_number += 1
         self._messages[self._message_number] = message
         self._LOGGER.debug('Publishing message # %i', self._message_number)
