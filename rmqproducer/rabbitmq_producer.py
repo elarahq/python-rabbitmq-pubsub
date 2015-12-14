@@ -57,7 +57,8 @@ class Publisher(object):
         self._channel = None
         self._messages = {}
         self._message_number = 0
-        self._closing = False
+        self._channel_closing = False
+        self._connection_closing = False
         self._LOGGER = logging.getLogger(__name__)
         self._url = amqp_url
         self.connect()
@@ -135,10 +136,9 @@ class Publisher(object):
 
         """
         self._channel = None
-        if self._closing:
+        if self._connection_closing:
             self._LOGGER.info('Connection was closed: (%s) %s',
                               reply_code, reply_text)
-            self._connection.ioloop.stop()
         else:
             self._LOGGER.warning('Connection closed, reopening in %d seconds: (%s) %s',
                                  RECONNECT_TIME, reply_code, reply_text)
@@ -208,9 +208,8 @@ class Publisher(object):
         """
         self._LOGGER.info('Channel was closed: (%s) %s',
                              reply_code, reply_text)
-        #We want connection to be alive in the connection pool
-        # if not self._closing:
-        #     self._connection.close()
+        if not self._channel_closing:
+            self.open_channel()
 
     def setup_exchange(self, exchange_name):
         """Setup the exchange on RabbitMQ by invoking the Exchange.Declare RPC
@@ -305,11 +304,11 @@ class Publisher(object):
         :param str routing_key: The routing key for the message to be published
 
         """
-        if self._closing:
+        if self._channel_closing:
             self._LOGGER.error(
                 "Following message couldn't be published: %s", message)
             return
-        self._channel.basic_publish(self.exchange, routing_key, message)
+        item = self._channel.basic_publish(self.exchange, routing_key, message)
         self._message_number += 1
         self._messages[self._message_number] = message
         self._LOGGER.debug('Publishing message # %i', self._message_number)
@@ -343,13 +342,13 @@ class Publisher(object):
 
         """
         try:
-            self.stop()
+            self.close_connection()
         except Exception as e:
             self._LOGGER.error(
                 "Could not gracefully stop connection on raised signal: " + str(e))
         sys.exit(0)
 
-    def stop(self):
+    def stop_channel(self):
         """Stop the publisher by closing the channel and connection. 
 
         Starting the IOLoop again will allow the publisher to cleanly
@@ -357,7 +356,7 @@ class Publisher(object):
 
         """
         self._LOGGER.info('Stopping')
-        self._closing = True
+        self._channel_closing = True
         self.close_channel()
         self._connection.ioloop.stop()
         self._LOGGER.info('Stopped')
@@ -365,7 +364,7 @@ class Publisher(object):
     def close_connection(self):
         """This method closes the connection to RabbitMQ."""
         self._LOGGER.info('Closing connection')
-        self._closing = True
+        self._connection_closing = True
         self._connection.close()
         RMQConnectionPool.remove_connection(self._url)
         self._connection.ioloop.start()
