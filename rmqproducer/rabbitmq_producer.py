@@ -96,7 +96,6 @@ class Publisher(object):
             connection = pika.SelectConnection(pika.URLParameters(self._url),
                                                self.on_connection_open,
                                                stop_ioloop_on_close=False)
-            RMQConnectionPool.put_connection(self._url, connection)
             self._connection = connection
         else:
             self._LOGGER.info('Connection received from connection pool')
@@ -223,6 +222,8 @@ class Publisher(object):
         if not self._channel_closing:
             self._LOGGER.warning('Reoppening Channel')
             self.reopen_channel()
+        else:
+            self._connection.ioloop.stop()
 
     def reopen_channel(self):
         unpublished_messages = self._messages
@@ -361,13 +362,13 @@ class Publisher(object):
 
         """
         try:
-            self.close_connection()
+            self.stop_connection()
         except Exception as e:
             self._LOGGER.error(
                 "Could not gracefully stop connection on raised signal: " + str(e))
         sys.exit(0)
 
-    def stop_channel(self):
+    def stop(self):
         """Stop the publisher by closing the channel and connection.
 
         Starting the IOLoop again will allow the publisher to cleanly
@@ -377,12 +378,13 @@ class Publisher(object):
         self._LOGGER.info('Closing Channel')
         self._channel_closing = True
         self.close_channel()
+        RMQConnectionPool.put_connection(self._url, self._connection)
         self._connection.ioloop.start()
 
-    def close_connection(self):
+    def stop_connection(self):
         """This method closes the connection to RabbitMQ."""
         self._LOGGER.info('Closing connection')
+        self._channel_closing = True
         self._connection_closing = True
         self._connection.close()
-        RMQConnectionPool.remove_connection(self._url)
         self._connection.ioloop.start()
