@@ -14,40 +14,40 @@ class Publisher(object):
     be closed, which usually are tied to permission related issues or
     socket timeouts.
 
-    It uses delivery confirmations and keeps track of messages that have been 
+    It uses delivery confirmations and keeps track of messages that have been
     sent and if they've been confirmed by RabbitMQ.
 
     """
 
     def __init__(self, amqp_url, exchange, **kwargs):
         """Create a new instance of the Publisher class, passing in the
-        parameters used to connect to RabbitMQ. It established connection and 
+        parameters used to connect to RabbitMQ. It established connection and
         created corresponding channel with defined exchange.
 
-        The optional arguments are: 
-        exchange_type, exchange_durable, exchange_auto_delete, exchange_internal, 
+        The optional arguments are:
+        exchange_type, exchange_durable, exchange_auto_delete, exchange_internal,
         delivery_confirmation, nack_callback, safe_stop
 
         :param str amqp_url: The AMQP url to connect with
         :param str exchange: Name of exchange
-        :param str exchange_type: The exchange type to use. It's default value 
+        :param str exchange_type: The exchange type to use. It's default value
                 is topic
-        :param bool exchange_durable: Survive a reboot of RabbitMQ. This is the 
-                durable flag used in exchange_declare() function of pika channel. 
+        :param bool exchange_durable: Survive a reboot of RabbitMQ. This is the
+                durable flag used in exchange_declare() function of pika channel.
                 It's default value is True
-        :param bool exchange_auto_delete: Remove when no more queues are bound 
-                to it. This is the auto_delete flag used in exchange_declare() 
+        :param bool exchange_auto_delete: Remove when no more queues are bound
+                to it. This is the auto_delete flag used in exchange_declare()
                 function of pika channel. It's default value is False
-        :param bool exchange_internal: Can only be published to by other 
-                exchanges. This is the internal flag used in exchange_declare() 
+        :param bool exchange_internal: Can only be published to by other
+                exchanges. This is the internal flag used in exchange_declare()
                 function of pika channel. It's default value is False
-        :param bool delivery_confirmation: If the confirmation of published 
+        :param bool delivery_confirmation: If the confirmation of published
                 message is required. It's default value is True.
-        :param method nack_callback: The method to callback when publishing of 
-                a message fails. Signature of the method: nack_callback(failed_message) 
+        :param method nack_callback: The method to callback when publishing of
+                a message fails. Signature of the method: nack_callback(failed_message)
                 where failed_message is the message which failed
-        :param bool safe_stop: If this option is True, system will try to 
-                gracefully stop the connection if the process is killed (with 
+        :param bool safe_stop: If this option is True, system will try to
+                gracefully stop the connection if the process is killed (with
                 SIGTERM signal). Its default value is True
 
         """
@@ -81,33 +81,32 @@ class Publisher(object):
     def connect(self):
         """This method connects to RabbitMQ, returning the connection handle.
         When the connection is established, the on_connection_open method
-        will be invoked by pika. 
+        will be invoked by pika.
 
-        Since we want the reconnection to work, we have set stop_ioloop_on_close 
+        Since we want the reconnection to work, we have set stop_ioloop_on_close
         to False, which is not the default behavior of this adapter.
 
         :rtype: pika.SelectConnection
 
         """
+        self._connection_closing = False
         self._LOGGER.info('Connecting to %s', self._url)
         connection = RMQConnectionPool.get_connection(self._url)
         if connection is None:
             connection = pika.SelectConnection(pika.URLParameters(self._url),
-                                                self.on_connection_open,
-                                                stop_ioloop_on_close=False)
-            RMQConnectionPool.put_connection(self._url, connection)
+                                               self.on_connection_open,
+                                               stop_ioloop_on_close=False)
             self._connection = connection
         else:
             self._LOGGER.info('Connection received from connection pool')
             self._connection = connection
-            self.add_on_connection_close_callback()
             self.open_channel()
 
     def on_connection_open(self, unused_connection):
         """This method is called by pika once the connection to RabbitMQ has
-        been established. 
+        been established.
 
-        It passes the handle to the connection object in case we need it, but 
+        It passes the handle to the connection object in case we need it, but
         in this case, we'll just mark it unused.
 
         :type unused_connection: pika.SelectConnection
@@ -150,7 +149,7 @@ class Publisher(object):
         closed. See the on_connection_closed method.
 
         """
-        self._LOGGER.info("Reconnecting to the server")
+        unpublished_messages = self._messages
         self.reset_messages()
 
         # This is the old connection IOLoop instance, stop its ioloop
@@ -160,14 +159,16 @@ class Publisher(object):
         # Create a new connection
         self.connect()
 
-        # There is now a new connection, needs a new ioloop to run
-        self._connection.ioloop.start()
+        # There is now a new connection
+        self.run()
+
+        #Publishing if messages were unpublished before closing the connection
+        if unpublished_messages:
+            self._LOGGER.info("Publishing Messages left on reconnection")
+            for message in unpublished_messages.values():
+                self.publish_message(message['message'], message['routing_key'])
 
     def reset_messages(self):
-        if len(self._messages) != 0:
-            self._LOGGER.error(
-                'These %d messages could not be published due to restarting of connection: %s',
-                len(self._messages), str(self._messages))
         self._messages = {}
         self._message_number = 0
 
@@ -179,6 +180,7 @@ class Publisher(object):
 
         """
         self._LOGGER.info('Creating a new channel')
+        self._channel_closing = False
         self._connection.channel(on_open_callback=self.on_channel_open)
 
     def on_channel_open(self, channel):
@@ -216,11 +218,27 @@ class Publisher(object):
         :param str reply_text: The text reason the channel was closed
 
         """
-        self._LOGGER.info('Channel was closed: (%s) %s',
-                          reply_code, reply_text)
         if not self._channel_closing:
-            self.reset_messages()
-            self.open_channel()
+            self._LOGGER.warning('Channel was closed: (%s) %s Reoppening Channel',
+                                  reply_code, reply_text)
+            self.reopen_channel()
+        else:
+            self._LOGGER.info('Channel was closed: (%s) %s',
+                          reply_code, reply_text)
+            self._connection.ioloop.stop()
+
+    def reopen_channel(self):
+        unpublished_messages = self._messages
+        self.reset_messages()
+        # This is the old connection IOLoop instance, stop its ioloop
+        self._connection.ioloop.stop()
+        self.open_channel()
+        self._connection.ioloop.start()
+        if unpublished_messages:
+            self._LOGGER.info(
+                "Publishing Messages left on channel reopening")
+            for message in unpublished_messages.values():
+                self.publish_message(message['message'], message['routing_key'])
 
     def setup_exchange(self, exchange_name):
         """Setup the exchange on RabbitMQ by invoking the Exchange.Declare RPC
@@ -247,7 +265,7 @@ class Publisher(object):
         self.start_publishing()
 
     def start_publishing(self):
-        """This method will enable delivery confirmations 
+        """This method will enable delivery confirmations
 
         """
         self._LOGGER.info('Issuing consumer related RPC commands')
@@ -274,12 +292,12 @@ class Publisher(object):
     def on_delivery_confirmation(self, method_frame):
         """Invoked by pika when RabbitMQ responds to a Basic.Publish RPC
         command, passing in either a Basic.Ack or Basic.Nack frame with
-        the delivery tag of the message that was published. 
+        the delivery tag of the message that was published.
 
-        The delivery tag is an integer counter indicating the message number 
-        that was sent on the channel via Basic.Publish. Here we're just doing 
-        house keeping to keep track of stats and remove message numbers that 
-        we expect a delivery confirmation of from the list used to keep track 
+        The delivery tag is an integer counter indicating the message number
+        that was sent on the channel via Basic.Publish. Here we're just doing
+        house keeping to keep track of stats and remove message numbers that
+        we expect a delivery confirmation of from the list used to keep track
         of messages that are pending confirmation.
 
         :param pika.frame.Method method_frame: Basic.Ack or Basic.Nack frame
@@ -291,17 +309,13 @@ class Publisher(object):
             self._LOGGER.info('Message %i published successfully',
                               message_num)
             self._LOGGER.debug('The message published: %s',
-                               self._messages[message_num])
+                               self._messages[message_num]['message'])
         if confirmation_type == 'nack':
             self._LOGGER.error('The message %i failed to publish: %s',
-                               message_num, self._messages[message_num])
+                               message_num, self._messages[message_num]['message'])
             if self.nack_callback:
-                self.nack_callback(self._messages[message_num])
-        try:
-            del self._messages[message_num]
-        except KeyError:
-            self._LOGGER.error(
-                "The message to delete after confirmation not present in dictionary")
+                self.nack_callback(self._messages[message_num]['message'])
+        del self._messages[message_num]
         self._connection.ioloop.stop()
 
     def publish_message(self, message, routing_key):
@@ -314,17 +328,20 @@ class Publisher(object):
         :param str routing_key: The routing key for the message to be published
 
         """
-        if self._channel_closing:
-            self._LOGGER.error(
-                "Following message couldn't be published: %s", message)
-            return
-        self._channel.basic_publish(self.exchange, routing_key, message, properties=pika.BasicProperties(
+        if self._channel.is_open:
+            self._channel.basic_publish(self.exchange, routing_key, message, properties=pika.BasicProperties(
                          delivery_mode = 2, # make message persistent
                       ))
+        else:
+            self._LOGGER.error("Channel not open. Message %s couldn't be published. "
+                               "Will try to publish message again if channel reopens", message)
+            return
         self._message_number += 1
-        self._messages[self._message_number] = message
+        self._messages[self._message_number] = {
+            'message': message, 'routing_key': routing_key}
         self._LOGGER.debug('Publishing message # %i', self._message_number)
-        self._connection.ioloop.start()
+        if self.delivery_confirmation:
+            self._connection.ioloop.start()
 
     def close_channel(self):
         """Invoke this command to close the channel with RabbitMQ by sending
@@ -353,27 +370,29 @@ class Publisher(object):
 
         """
         try:
-            self.close_connection()
+            self.stop_connection()
         except Exception as e:
             self._LOGGER.error(
                 "Could not gracefully stop connection on raised signal: " + str(e))
         sys.exit(0)
 
-    def close_channel(self):
-        """Stop the publisher by closing the channel and connection. 
+    def stop(self):
+        """Stop the publisher by closing the channel and connection.
 
         Starting the IOLoop again will allow the publisher to cleanly
         disconnect from RabbitMQ.
 
         """
-        self._LOGGER.info('Closing Channel')
         self._channel_closing = True
         self.close_channel()
+        RMQConnectionPool.put_connection(self._url, self._connection)
+        self._connection.ioloop.start()
 
-    def close_connection(self):
+    def stop_connection(self):
         """This method closes the connection to RabbitMQ."""
         self._LOGGER.info('Closing connection')
+        self._channel_closing = True
         self._connection_closing = True
+        self._channel.close()
         self._connection.close()
-        RMQConnectionPool.remove_connection(self._url)
         self._connection.ioloop.start()

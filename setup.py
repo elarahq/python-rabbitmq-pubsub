@@ -8,7 +8,7 @@ def readme():
 setup(name='rmqreceiver',
       version='0.1.3',
       description='Rabbitmq Receiver',
-      url='https://github.com/loconsolutions/python.rabbitmq.receiver',
+      url='https://github.com/loconsolutions/python.rabbitmq.publisher_receiver',
       author='Rahul Kumar',
       author_email='rahul.kumar@housing.com',
       license='MIT',
