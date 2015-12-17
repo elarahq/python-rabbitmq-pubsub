@@ -1,2 +1,2 @@
-from .rmqproducer import Publisher
-from .rmqreceiver import Receiver
+from rmq.rmqproducer.rabbitmq_producer import Publisher
+from rmq.rmqreceiver.rabbitmq_receiver import Receiver
