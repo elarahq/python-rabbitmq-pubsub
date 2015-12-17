@@ -100,6 +100,8 @@ class Publisher(object):
         else:
             self._LOGGER.info('Connection received from connection pool')
             self._connection = connection
+            #Not sure about this statement but works fine if not removed!!
+            self.add_on_connection_close_callback()
             self.open_channel()
 
     def on_connection_open(self, unused_connection):
@@ -154,7 +156,6 @@ class Publisher(object):
 
         # This is the old connection IOLoop instance, stop its ioloop
         self._connection.ioloop.stop()
-        RMQConnectionPool.remove_connection(self._url)
 
         # Create a new connection
         self.connect()
@@ -340,6 +341,7 @@ class Publisher(object):
         self._messages[self._message_number] = {
             'message': message, 'routing_key': routing_key}
         self._LOGGER.debug('Publishing message # %i', self._message_number)
+
         if self.delivery_confirmation:
             self._connection.ioloop.start()
 
@@ -385,14 +387,14 @@ class Publisher(object):
         """
         self._channel_closing = True
         self.close_channel()
-        RMQConnectionPool.put_connection(self._url, self._connection)
+        if not self._connection_closing:
+            RMQConnectionPool.put_connection(self._url, self._connection)
         self._connection.ioloop.start()
 
     def stop_connection(self):
         """This method closes the connection to RabbitMQ."""
-        self._LOGGER.info('Closing connection')
-        self._channel_closing = True
         self._connection_closing = True
-        self._channel.close()
+        self._LOGGER.info('Closing connection')
+        self.stop()
         self._connection.close()
         self._connection.ioloop.start()
