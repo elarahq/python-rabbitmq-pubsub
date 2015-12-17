@@ -10,7 +10,8 @@ Changelog
 2.0.0
 -----
 
-* Adding extra package for RabbitMQ Publisher.
+* Adding extra module for RabbitMQ Publisher.
+**This update has backward incompatibility for Receiver class**
 
 0.1.2
 -----
@@ -30,18 +31,18 @@ Changelog
 Description
 ===========
 
-It contains two packages = rmqproducer and rmqreceiver. The package rmqreceiver has a Receiver class which can be imported to implement a rabbitmq consumer. This class contains a lot of functions for tasks like: to make connection to rabbitmq server, to change configuration of exchange and queue binding, to start listing the messages, to safely stop the connection. SelectConnection is being used by Receiver class for its asynchronous design. Similarly the package rmqproducer has a Publisher class which can be imported to implement a rabbitmq publisher.
+It contains two modules - rmqproducer and rmqreceiver. The module rmqreceiver has a Receiver class which can be imported to implement a rabbitmq consumer. This class contains a lot of functions for tasks like: to make connection to rabbitmq server, to change configuration of exchange and queue binding, to start listing the messages, to safely stop the connection. SelectConnection is being used by Receiver class for its asynchronous design. Similarly the module rmqproducer has a Publisher class which can be imported to implement a rabbitmq publisher.
 
 Installation
 ============
 To install the latest version of the package, user can use the command:
-    pip install git+https://github.com/loconsolutions/python.rabbitmq.publisher_receiver.git
+    pip install git+https://github.com/loconsolutions/python-rabbitmq-pubsub.git
 
 To install a specific version x.x use the following command:
-    pip install git+https://github.com/loconsolutions/python.rabbitmq.publisher_receiver.git@version_x.x
+    pip install git+https://github.com/loconsolutions/python-rabbitmq-pubsub.git@version_x.x
 
 for example to install version 0.1 command to be used will be:
-    pip install git+https://github.com/loconsolutions/python.rabbitmq.publisher_receiver.git@version_0.1
+    pip install git+https://github.com/loconsolutions/python-rabbitmq-pubsub.git@version_0.1
 
 
 Usage
@@ -122,7 +123,7 @@ Here is the sample code to use the rabbitmq receiver.
 
 .. code:: python
 
-    from rmqreceiver import Receiver
+    from rmq import Receiver
     def consumer_callback(unused_channel, basic_deliver, properties, body):
         #do something.
         print "The message received is: %s" % body
@@ -155,7 +156,7 @@ A sample code to use the rabbitmq publisher
 
     import time
     import logging
-    from rmqproducer import Publisher
+    from rmq import Publisher
 
     logging.basicConfig(level=logging.INFO)
 
