@@ -12,7 +12,7 @@ setup(name='rmq-pub-sub',
       author='Rahul Kumar and Bipul Karnani',
       author_email='rahul.kumar@housing.com',
       license='MIT',
-      packages=['rmq', 'rmq.rmqproducer', 'rmq.rmqreceiver'],
+      packages=['rmq'],
       install_requires=[
           'pika',
       ],
