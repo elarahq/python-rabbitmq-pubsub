@@ -49,6 +49,9 @@ class Publisher(object):
         :param bool safe_stop: If this option is True, system will try to
                 gracefully stop the connection if the process is killed (with
                 SIGTERM signal). Its default value is True
+        :param reconnect_time: The number of seconds after which connection will 
+                automatically restart if it accidently stops. Its default value 
+                is 5 seconds.
 
         """
         self._connection = None
@@ -84,7 +87,9 @@ class Publisher(object):
         will be invoked by pika.
 
         Since we want the reconnection to work, we have set stop_ioloop_on_close
-        to False, which is not the default behavior of this adapter.
+        to False, which is not the default behavior of this adapter. This method 
+        first searches the connection in the connection pool and creates a new 
+        one if not found.
 
         :rtype: pika.SelectConnection
 
@@ -100,7 +105,7 @@ class Publisher(object):
         else:
             self._LOGGER.info('Connection received from connection pool')
             self._connection = connection
-            #Not sure about this statement but works fine if not removed!!
+            # Not sure about this statement but works fine if not removed!!
             self.add_on_connection_close_callback()
             self.open_channel()
 
@@ -163,13 +168,20 @@ class Publisher(object):
         # There is now a new connection
         self.run()
 
-        #Publishing if messages were unpublished before closing the connection
+        # Publishing if messages were unpublished before closing the connection
         if unpublished_messages:
             self._LOGGER.info("Publishing Messages left on reconnection")
             for message in unpublished_messages.values():
-                self.publish_message(message['message'], message['routing_key'])
+                self.publish_message(
+                    message['message'], message['routing_key'])
 
     def reset_messages(self):
+        """This method resets message dictionary and message counter. Since 
+        message counter restarts from server side each time channel or 
+        connection is restarted, we need to restart counter from client side 
+        as well.
+
+        """
         self._messages = {}
         self._message_number = 0
 
@@ -211,8 +223,7 @@ class Publisher(object):
 
         Channels are usually closed if you attempt to do something that
         violates the protocol, such as re-declare an exchange or queue with
-        different parameters. In this case, we'll close the connection
-        to shutdown the object.
+        different parameters. Channel is restarted again if closed accidently.
 
         :param pika.channel.Channel: The closed channel
         :param int reply_code: The numeric reason the channel was closed
@@ -221,14 +232,18 @@ class Publisher(object):
         """
         if not self._channel_closing:
             self._LOGGER.warning('Channel was closed: (%s) %s Reoppening Channel',
-                                  reply_code, reply_text)
+                                 reply_code, reply_text)
             self.reopen_channel()
         else:
             self._LOGGER.info('Channel was closed: (%s) %s',
-                          reply_code, reply_text)
+                              reply_code, reply_text)
             self._connection.ioloop.stop()
 
     def reopen_channel(self):
+        """This method opens the channel again and publishes the messages which 
+        were left unpublished
+
+        """
         unpublished_messages = self._messages
         self.reset_messages()
         # This is the old connection IOLoop instance, stop its ioloop
@@ -239,7 +254,8 @@ class Publisher(object):
             self._LOGGER.info(
                 "Publishing Messages left on channel reopening")
             for message in unpublished_messages.values():
-                self.publish_message(message['message'], message['routing_key'])
+                self.publish_message(
+                    message['message'], message['routing_key'])
 
     def setup_exchange(self, exchange_name):
         """Setup the exchange on RabbitMQ by invoking the Exchange.Declare RPC
@@ -320,10 +336,10 @@ class Publisher(object):
         self._connection.ioloop.stop()
 
     def publish_message(self, message, routing_key):
-        """If the class is not stopping, publish a message to RabbitMQ,
-        appending a list of deliveries with the message number that was sent.
-        This list will be used to check for delivery confirmations in the
-        on_delivery_confirmations method.
+        """This method publish a message to RabbitMQ, appending a list of 
+        deliveries with the message number that was sent. This list will be 
+        used to check for delivery confirmations in the on_delivery_confirmations 
+        method.
 
         :param str message: The message to be published
         :param str routing_key: The routing key for the message to be published
@@ -331,8 +347,8 @@ class Publisher(object):
         """
         if self._channel.is_open:
             self._channel.basic_publish(self.exchange, routing_key, message, properties=pika.BasicProperties(
-                         delivery_mode = 2, # make message persistent
-                      ))
+                delivery_mode=2,  # make message persistent
+            ))
         else:
             self._LOGGER.error("Channel not open. Message %s couldn't be published. "
                                "Will try to publish message again if channel reopens", message)
@@ -355,8 +371,7 @@ class Publisher(object):
             self._channel.close()
 
     def run(self, **kwargs):
-        """Run the example code by connecting and then starting the IOLoop.
-
+        """Run the publisher code by starting the IOLoop.
 
         """
         if self.safe_stop:
@@ -379,10 +394,11 @@ class Publisher(object):
         sys.exit(0)
 
     def stop(self):
-        """Stop the publisher by closing the channel and connection.
-
-        Starting the IOLoop again will allow the publisher to cleanly
-        disconnect from RabbitMQ.
+        """This method stops the channel and puts the connection back into the 
+        connection pool. Users are strongly recommended to use this method after 
+        they are done with the publishing of messages so that connection can 
+        be sent back to the pool and reused by some other user saving the cost 
+        of creating a new connection
 
         """
         self._channel_closing = True

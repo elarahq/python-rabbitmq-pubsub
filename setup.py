@@ -5,11 +5,11 @@ def readme():
     with open('README.rst') as f:
         return f.read()
 
-setup(name='rmqreceiver',
-      version='0.1.3',
+setup(name='rmqutils',
+      version='2.0.0',
       description='Rabbitmq Receiver',
       url='https://github.com/loconsolutions/python.rabbitmq.publisher_receiver',
-      author='Rahul Kumar',
+      author='Rahul Kumar and Bipul Karnani',
       author_email='rahul.kumar@housing.com',
       license='MIT',
       packages=['rmqreceiver', 'rmqproducer'],
