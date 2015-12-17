@@ -31,7 +31,7 @@ Changelog
 Description
 ===========
 
-It contains two modules - rmqproducer and rmqreceiver. The module rmqreceiver has a Receiver class which can be imported to implement a rabbitmq consumer. This class contains a lot of functions for tasks like: to make connection to rabbitmq server, to change configuration of exchange and queue binding, to start listing the messages, to safely stop the connection. SelectConnection is being used by Receiver class for its asynchronous design. Similarly the module rmqproducer has a Publisher class which can be imported to implement a rabbitmq publisher.
+This package rmq-pub-sub contains two modules - rmqproducer and rmqreceiver. The module rmqreceiver has a Receiver class which can be imported to implement a rabbitmq consumer. This class contains a lot of functions for tasks like: to make connection to rabbitmq server, to change configuration of exchange and queue binding, to start listing the messages, to safely stop the connection. SelectConnection is being used by Receiver class for its asynchronous design. Similarly the module rmqproducer has a Publisher class which can be imported to implement a rabbitmq publisher.
 
 Installation
 ============
@@ -43,6 +43,9 @@ To install a specific version x.x use the following command:
 
 for example to install version 0.1 command to be used will be:
     pip install git+https://github.com/loconsolutions/python-rabbitmq-pubsub.git@version_0.1
+
+To uninstall the package use the command:
+    pip uninstall rmq-pub-sub
 
 
 Usage
