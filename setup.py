@@ -5,14 +5,14 @@ def readme():
     with open('README.rst') as f:
         return f.read()
 
-setup(name='rmqreceiver',
-      version='0.1.2',
-      description='Rabbitmq Receiver',
-      url='https://github.com/loconsolutions/python.rabbitmq.receiver',
-      author='Rahul Kumar',
+setup(name='rmq-pub-sub',
+      version='2.0',
+      description='Rabbitmq Receiver and Publisher',
+      url='https://github.com/loconsolutions/python-rabbitmq-pubsub',
+      author='Rahul Kumar and Bipul Karnani',
       author_email='rahul.kumar@housing.com',
       license='MIT',
-      packages=['rmqreceiver'],
+      packages=['rmq', 'rmq.rmqproducer', 'rmq.rmqreceiver'],
       install_requires=[
           'pika',
       ],
