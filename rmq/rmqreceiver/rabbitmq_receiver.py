@@ -345,8 +345,8 @@ class Receiver(object):
         :param str|unicode body: The message body
 
         """
-        self._LOGGER.info('Received message # %s from %s',
-                          basic_deliver.delivery_tag, properties.app_id)
+        self._LOGGER.debug('Received message # %s from %s',
+                           basic_deliver.delivery_tag, properties.app_id)
         self._LOGGER.debug('Message Received: %s', body)
         self.consumer_callback(unused_channel, basic_deliver, properties, body)
         if not self.no_ack:
@@ -359,7 +359,7 @@ class Receiver(object):
         :param int delivery_tag: The delivery tag from the Basic.Deliver frame
 
         """
-        self._LOGGER.info('Acknowledging message %s', delivery_tag)
+        self._LOGGER.debug('Acknowledging message %s', delivery_tag)
         self._channel.basic_ack(delivery_tag)
 
     def stop_consuming(self):
