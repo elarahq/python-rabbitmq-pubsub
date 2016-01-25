@@ -7,6 +7,11 @@ A rabbitmq publisher and  receiver that implements a safe and reliable rabbitmq 
 Changelog
 =========
 
+2.0.1
+-----
+
+* Changed the logging of message reeived and acknowledged to debug mode instead of info mode.
+
 2.0
 ---
 
