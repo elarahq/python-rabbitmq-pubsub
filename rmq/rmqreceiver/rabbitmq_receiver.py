@@ -121,7 +121,7 @@ class Receiver(object):
         self._connection.add_on_close_callback(self.on_connection_closed)
 
     def on_connection_error(self, connection, error):
-        print("Connection failed..retrying in 5 seconds")
+        self._LOGGER.warning("Connection failed.Retrying in next 5 seconds")
         connection.add_timeout(5, self.reconnect)
 
     def on_connection_closed(self, connection, reply_code, reply_text):
