@@ -124,9 +124,11 @@ class Publisher(object):
         :type unused_connection: pika.SelectConnection
 
         """
+        print("connected")
         self._LOGGER.info('Connection opened')
         self.add_on_connection_close_callback()
         self.open_channel()
+        self.prev_backoff = 1
     
     def get_retry_time(self):
         backoff = min(30, self.prev_backoff*2)
@@ -137,6 +139,7 @@ class Publisher(object):
 
     def on_connection_error(self, connection, error):
         retry_time = self.get_retry_time()
+        print("Connection lost retrying after {time}".format(time=retry_time))
         self._LOGGER.warning("Publisher: Connection lost retrying in {time}".format(time=retry_time))
         connection.add_timeout(retry_time, self.reconnect)
 

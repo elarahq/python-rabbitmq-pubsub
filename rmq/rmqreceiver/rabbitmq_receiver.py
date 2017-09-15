@@ -109,9 +109,11 @@ class Receiver(object):
         :type unused_connection: pika.SelectConnection
 
         """
+        print("Connected")
         self._LOGGER.info('Connection opened')
         self.add_on_connection_close_callback()
         self.open_channel()
+        self.prev_backoff = 1
 
     def add_on_connection_close_callback(self):
         """Add a callback that will be invoked if RabbitMQ closes the connection
