@@ -109,7 +109,6 @@ class Receiver(object):
         :type unused_connection: pika.SelectConnection
 
         """
-        print("Connected")
         self._LOGGER.info('Connection opened')
         self.add_on_connection_close_callback()
         self.open_channel()
@@ -133,7 +132,6 @@ class Receiver(object):
 
     def on_connection_error(self, connection, error):
         retry_time = self.get_retry_time()
-        print("Retrying in {time}".format(time=retry_time))
         self._LOGGER.warning("Connection failed.Retrying in next 5 seconds")
         connection.add_timeout(retry_time, self.reconnect)
 
