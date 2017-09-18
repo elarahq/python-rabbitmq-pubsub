@@ -123,17 +123,19 @@ class Receiver(object):
         self._LOGGER.info('Adding connection close callback')
         self._connection.add_on_close_callback(self.on_connection_closed)
 
+    """
     def get_retry_time(self):
         backoff = min(30, self.prev_backoff*2)
         retry_after = randint(1, backoff)
         self.prev_backoff = backoff
         return retry_after
+    """
 
 
     def on_connection_error(self, connection, error):
-        retry_time = self.get_retry_time()
+        #retry_time = self.get_retry_time()
         self._LOGGER.warning("Connection failed.Retrying in next 5 seconds")
-        connection.add_timeout(retry_time, self.reconnect)
+        connection.add_timeout(5, self.reconnect)
 
     def on_connection_closed(self, connection, reply_code, reply_text):
         """Invoked by pika when the connection to RabbitMQ is closed unexpectedly.
@@ -151,7 +153,7 @@ class Receiver(object):
         else:
             self._LOGGER.warning('Connection closed, reopening in 5 seconds: (%s) %s',
                                  reply_code, reply_text)
-            self._connection.add_timeout(self.get_retry_time(), self.reconnect)
+            self._connection.add_timeout(5, self.reconnect)
 
     def reconnect(self):
         """Invoked by the IOLoop timer if the connection is

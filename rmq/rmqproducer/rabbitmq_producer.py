@@ -128,18 +128,20 @@ class Publisher(object):
         self.add_on_connection_close_callback()
         self.open_channel()
         self.prev_backoff = 1
-    
+
+    """    
     def get_retry_time(self):
         backoff = min(30, self.prev_backoff*2)
         retry_after = randint(1, backoff)
         self.prev_backoff = backoff
         return retry_after
+    """
 
 
     def on_connection_error(self, connection, error):
-        retry_time = self.get_retry_time()
-        self._LOGGER.warning("Publisher: Connection lost retrying in {time}".format(time=retry_time))
-        connection.add_timeout(retry_time, self.reconnect)
+        #retry_time = self.get_retry_time()
+        self._LOGGER.warning("Publisher: Connection lost retrying in {time}".format(time=5))
+        connection.add_timeout(5, self.reconnect)
 
 
     def add_on_connection_close_callback(self):
@@ -168,7 +170,7 @@ class Publisher(object):
         else:
             self._LOGGER.warning('Connection closed, reopening in %d seconds: (%s) %s',
                                  self.reconnect_time, reply_code, reply_text)
-            self._connection.add_timeout(self.get_retry_time(), self.reconnect)
+            self._connection.add_timeout(5, self.reconnect)
 
     def reconnect(self):
         """Will be invoked by the IOLoop timer if the connection is
