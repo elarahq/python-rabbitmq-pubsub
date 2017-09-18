@@ -20,7 +20,6 @@ class Publisher(object):
 
     """
 
-    prev_backoff = 1
 
     def __init__(self, amqp_url, exchange, **kwargs):
         """Create a new instance of the Publisher class, passing in the
@@ -69,7 +68,6 @@ class Publisher(object):
         self.parse_input_args(kwargs)
         self.connect()
         self.run()
-        self.prev_backoff = 1
 
     def parse_input_args(self, kwargs):
         """Parse and set connection parameters from a dictionary.
@@ -127,19 +125,9 @@ class Publisher(object):
         self._LOGGER.info('Connection opened')
         self.add_on_connection_close_callback()
         self.open_channel()
-        self.prev_backoff = 1
-
-    """    
-    def get_retry_time(self):
-        backoff = min(30, self.prev_backoff*2)
-        retry_after = randint(1, backoff)
-        self.prev_backoff = backoff
-        return retry_after
-    """
-
-
+    
+    
     def on_connection_error(self, connection, error):
-        #retry_time = self.get_retry_time()
         self._LOGGER.warning("Publisher: Connection lost retrying in {time}".format(time=5))
         connection.add_timeout(5, self.reconnect)
 

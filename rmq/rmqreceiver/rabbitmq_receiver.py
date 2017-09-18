@@ -63,7 +63,6 @@ class Receiver(object):
         self._url = amqp_url
         self.exchange = exchange
         self.parse_input_args(kwargs)
-        self.prev_backoff = 1
 
     def parse_input_args(self, kwargs):
         """Parse and set connection parameters from a dictionary.
@@ -112,7 +111,6 @@ class Receiver(object):
         self._LOGGER.info('Connection opened')
         self.add_on_connection_close_callback()
         self.open_channel()
-        self.prev_backoff = 1
 
     def add_on_connection_close_callback(self):
         """Add a callback that will be invoked if RabbitMQ closes the connection
@@ -123,17 +121,10 @@ class Receiver(object):
         self._LOGGER.info('Adding connection close callback')
         self._connection.add_on_close_callback(self.on_connection_closed)
 
-    """
-    def get_retry_time(self):
-        backoff = min(30, self.prev_backoff*2)
-        retry_after = randint(1, backoff)
-        self.prev_backoff = backoff
-        return retry_after
-    """
+   
 
 
     def on_connection_error(self, connection, error):
-        #retry_time = self.get_retry_time()
         self._LOGGER.warning("Connection failed.Retrying in next 5 seconds")
         connection.add_timeout(5, self.reconnect)
 
