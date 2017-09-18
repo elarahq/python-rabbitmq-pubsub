@@ -2,6 +2,7 @@ import sys
 import pika
 import signal
 import logging
+from random import randint
 
 
 class Receiver(object):
@@ -94,6 +95,7 @@ class Receiver(object):
         self._LOGGER.info('Connecting to %s', self._url)
         return pika.SelectConnection(pika.URLParameters(self._url),
                                      self.on_connection_open,
+                                     self.on_connection_error,
                                      stop_ioloop_on_close=False)
 
     def on_connection_open(self, unused_connection):
@@ -118,6 +120,13 @@ class Receiver(object):
         """
         self._LOGGER.info('Adding connection close callback')
         self._connection.add_on_close_callback(self.on_connection_closed)
+
+   
+
+
+    def on_connection_error(self, connection, error):
+        self._LOGGER.warning("Connection failed.Retrying in next 5 seconds")
+        connection.add_timeout(5, self.reconnect)
 
     def on_connection_closed(self, connection, reply_code, reply_text):
         """Invoked by pika when the connection to RabbitMQ is closed unexpectedly.

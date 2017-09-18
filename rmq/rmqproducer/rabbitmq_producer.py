@@ -3,6 +3,7 @@ import pika
 import signal
 import logging
 from connection import RMQConnectionPool
+from random import randint
 
 
 class Publisher(object):
@@ -18,6 +19,7 @@ class Publisher(object):
     sent and if they've been confirmed by RabbitMQ.
 
     """
+
 
     def __init__(self, amqp_url, exchange, **kwargs):
         """Create a new instance of the Publisher class, passing in the
@@ -100,6 +102,7 @@ class Publisher(object):
         if connection is None:
             connection = pika.SelectConnection(pika.URLParameters(self._url),
                                                self.on_connection_open,
+                                               self.on_connection_error,
                                                stop_ioloop_on_close=False)
             self._connection = connection
         else:
@@ -122,6 +125,12 @@ class Publisher(object):
         self._LOGGER.info('Connection opened')
         self.add_on_connection_close_callback()
         self.open_channel()
+    
+    
+    def on_connection_error(self, connection, error):
+        self._LOGGER.warning("Publisher: Connection lost retrying in {time}".format(time=5))
+        connection.add_timeout(5, self.reconnect)
+
 
     def add_on_connection_close_callback(self):
         """This method adds an on close callback that will be invoked by pika
@@ -149,7 +158,7 @@ class Publisher(object):
         else:
             self._LOGGER.warning('Connection closed, reopening in %d seconds: (%s) %s',
                                  self.reconnect_time, reply_code, reply_text)
-            self._connection.add_timeout(self.reconnect_time, self.reconnect)
+            self._connection.add_timeout(5, self.reconnect)
 
     def reconnect(self):
         """Will be invoked by the IOLoop timer if the connection is

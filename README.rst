@@ -6,6 +6,10 @@ A rabbitmq publisher and  receiver that implements a safe and reliable rabbitmq 
 
 Changelog
 =========
+2.0.2
+-----
+
+* Added retry on connection lost.
 
 2.0.1
 -----
