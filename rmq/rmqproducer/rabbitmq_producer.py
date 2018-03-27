@@ -5,7 +5,6 @@ import logging
 from connection import RMQConnectionPool
 from random import randint
 
-
 class Publisher(object):
     """This is a safe and robust publisher that will handle unexpected interactions
     with RabbitMQ such as channel and connection closures.
@@ -242,7 +241,8 @@ class Publisher(object):
         if not self._channel_closing:
             self._LOGGER.warning('Channel was closed: (%s) %s Reoppening Channel',
                                  reply_code, reply_text)
-            self.reopen_channel()
+            # self.reopen_channel()
+            self.reconnect()
         else:
             self._LOGGER.info('Channel was closed: (%s) %s',
                               reply_code, reply_text)
