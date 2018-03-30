@@ -92,7 +92,7 @@ class Receiver(object):
         :rtype: pika.SelectConnection
 
         """
-        self._LOGGER.info('Connecting to %s', self._url)
+        self._LOGGER.info('Connecting to %s with queue %s and exchange %s', self._url, self.queue, self.exchange)
         return pika.SelectConnection(pika.URLParameters(self._url),
                                      self.on_connection_open,
                                      self.on_connection_error,
@@ -108,7 +108,7 @@ class Receiver(object):
         :type unused_connection: pika.SelectConnection
 
         """
-        self._LOGGER.info('Connection opened')
+        self._LOGGER.info('Connection opened for queue %s', self.queue)
         self.add_on_connection_close_callback()
         self.open_channel()
 
@@ -125,7 +125,7 @@ class Receiver(object):
 
 
     def on_connection_error(self, connection, error):
-        self._LOGGER.warning("Connection failed.Retrying in next 5 seconds")
+        self._LOGGER.warning("Connection failed.Retrying in next 5 seconds for queue %s", self.queue)
         connection.add_timeout(5, self.reconnect)
 
     def on_connection_closed(self, connection, reply_code, reply_text):
