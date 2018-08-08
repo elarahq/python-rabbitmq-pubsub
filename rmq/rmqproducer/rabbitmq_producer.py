@@ -354,9 +354,9 @@ class Publisher(object):
         :param str routing_key: The routing key for the message to be published
 
         """
-        if not self._channel.is_open:
+        if not self._channel or not self._channel.is_open or not self._connection or not self._connection.is_open:
             self.reconnect()
-            self.reconnect()
+
         self._channel.basic_publish(self.exchange, routing_key, message, properties=pika.BasicProperties(
             delivery_mode=2,  # make message persistent
         ))
