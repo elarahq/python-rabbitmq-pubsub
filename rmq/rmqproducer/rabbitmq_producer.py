@@ -238,13 +238,9 @@ class Publisher(object):
         :param str reply_text: The text reason the channel was closed
 
         """
-        if not self._channel_closing:
-            self._LOGGER.warning('Channel was closed: (%s) %s Reoppening Channel',
-                                 reply_code, reply_text)
-        else:
-            self._LOGGER.info('Channel was closed: (%s) %s',
-                              reply_code, reply_text)
-            self._connection.ioloop.stop()
+        self._LOGGER.info('Channel was closed: (%s) %s',
+                          reply_code, reply_text)
+        self._connection.ioloop.stop()
 
     def reopen_channel(self):
         """This method opens the channel again and publishes the messages which 
