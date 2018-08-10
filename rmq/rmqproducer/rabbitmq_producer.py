@@ -351,9 +351,13 @@ class Publisher(object):
         if not (self._channel and self._channel.is_open and self._connection and self._connection.is_open):
             self.reconnect()
 
-        self._channel.basic_publish(self.exchange, routing_key, message, properties=pika.BasicProperties(
-            delivery_mode=2,  # make message persistent
-        ))
+        try:
+            self._channel.basic_publish(self.exchange, routing_key, message, properties=pika.BasicProperties(
+                delivery_mode=2,  # make message persistent
+            ))
+        except:
+            self._LOGGER.debug('Not able to publish after reconnect')
+            return
 
         self._message_number += 1
         self._messages[self._message_number] = {
