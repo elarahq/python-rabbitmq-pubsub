@@ -356,7 +356,7 @@ class Publisher(object):
                 delivery_mode=2,  # make message persistent
             ))
         except:
-            self._LOGGER.debug('Not able to publish even after reconnect')
+            self._LOGGER.debug('Not able to publish even after reconnect!!')
             return
 
         self._message_number += 1
