@@ -238,15 +238,9 @@ class Publisher(object):
         :param str reply_text: The text reason the channel was closed
 
         """
-        if not self._channel_closing:
-            self._LOGGER.warning('Channel was closed: (%s) %s Reoppening Channel',
-                                 reply_code, reply_text)
-            # self.reopen_channel()
-            self.reconnect()
-        else:
-            self._LOGGER.info('Channel was closed: (%s) %s',
-                              reply_code, reply_text)
-            self._connection.ioloop.stop()
+        self._LOGGER.info('Channel was closed: (%s) %s',
+                          reply_code, reply_text)
+        self._connection.ioloop.stop()
 
     def reopen_channel(self):
         """This method opens the channel again and publishes the messages which 
@@ -354,14 +348,17 @@ class Publisher(object):
         :param str routing_key: The routing key for the message to be published
 
         """
-        if self._channel.is_open:
+        if not (self._channel and self._channel.is_open and self._connection and self._connection.is_open):
+            self.reconnect()
+
+        try:
             self._channel.basic_publish(self.exchange, routing_key, message, properties=pika.BasicProperties(
                 delivery_mode=2,  # make message persistent
             ))
-        else:
-            self._LOGGER.error("Channel not open. Message %s couldn't be published. "
-                               "Will try to publish message again if channel reopens", message)
+        except:
+            self._LOGGER.debug('Not able to publish even after reconnect!!')
             return
+
         self._message_number += 1
         self._messages[self._message_number] = {
             'message': message, 'routing_key': routing_key}
