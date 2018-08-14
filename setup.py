@@ -6,7 +6,7 @@ def readme():
         return f.read()
 
 setup(name='rmq-pub-sub',
-      version='3.0.2',
+      version='2.0.2',
       description='Rabbitmq Receiver and Publisher',
       url='https://github.com/loconsolutions/python-rabbitmq-pubsub',
       author='Rahul Kumar and Bipul Karnani',
