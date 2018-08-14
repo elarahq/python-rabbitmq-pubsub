@@ -241,8 +241,8 @@ class Publisher(object):
         if not self._channel_closing:
             self._LOGGER.warning('Channel was closed: (%s) %s Reoppening Channel',
                                  reply_code, reply_text)
-            # self.reopen_channel()
-            self.reconnect()
+            self.reopen_channel()
+            # self.reconnect()
         else:
             self._LOGGER.info('Channel was closed: (%s) %s',
                               reply_code, reply_text)
