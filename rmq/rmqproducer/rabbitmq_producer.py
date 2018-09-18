@@ -2,7 +2,6 @@ import sys
 import pika
 import signal
 import logging
-from connection import RMQConnectionPool
 from random import randint
 
 class Publisher(object):
@@ -97,19 +96,11 @@ class Publisher(object):
         """
         self._connection_closing = False
         self._LOGGER.info('Connecting to %s', self._url)
-        connection = RMQConnectionPool.get_connection(self._url)
-        if connection is None:
-            connection = pika.SelectConnection(pika.URLParameters(self._url),
+        connection = pika.SelectConnection(pika.URLParameters(self._url),
                                                self.on_connection_open,
                                                self.on_connection_error,
                                                stop_ioloop_on_close=False)
-            self._connection = connection
-        else:
-            self._LOGGER.info('Connection received from connection pool')
-            self._connection = connection
-            # Not sure about this statement but works fine if not removed!!
-            self.add_on_connection_close_callback()
-            self.open_channel()
+        self._connection = connection
 
     def on_connection_open(self, unused_connection):
         """This method is called by pika once the connection to RabbitMQ has
@@ -149,6 +140,7 @@ class Publisher(object):
         :param str reply_text: The server provided reply_text if given
 
         """
+        self._LOGGER.warn("encountered on_connection_closed")
         self._channel = None
         if self._connection_closing:
             self._LOGGER.info('Connection was closed: (%s) %s',
@@ -164,6 +156,7 @@ class Publisher(object):
         closed. See the on_connection_closed method.
 
         """
+        self._LOGGER.warn("trying to reconnect channel")
         unpublished_messages = self._messages
         self.reset_messages()
 
@@ -173,12 +166,13 @@ class Publisher(object):
         # Create a new connection
         self.connect()
 
+        self._LOGGER.warn("connection made inside reconnect")
         # There is now a new connection
         self.run()
 
         # Publishing if messages were unpublished before closing the connection
         if unpublished_messages:
-            self._LOGGER.info("Publishing Messages left on reconnection")
+            self._LOGGER.warn("Publishing Messages left on reconnection")
             for message in unpublished_messages.values():
                 self.publish_message(
                     message['message'], message['routing_key'])
@@ -241,8 +235,8 @@ class Publisher(object):
         if not self._channel_closing:
             self._LOGGER.warning('Channel was closed: (%s) %s Reoppening Channel',
                                  reply_code, reply_text)
-            self.reopen_channel()
-            # self.reconnect()
+            self._channel = None
+            self.reconnect()
         else:
             self._LOGGER.info('Channel was closed: (%s) %s',
                               reply_code, reply_text)
@@ -253,6 +247,7 @@ class Publisher(object):
         were left unpublished
 
         """
+        self._LOGGER.warn("trying to reopen channel")
         unpublished_messages = self._messages
         self.reset_messages()
         # This is the old connection IOLoop instance, stop its ioloop
@@ -265,6 +260,7 @@ class Publisher(object):
             for message in unpublished_messages.values():
                 self.publish_message(
                     message['message'], message['routing_key'])
+        self._LOGGER.warn("reopening channel successful")
 
     def setup_exchange(self, exchange_name):
         """Setup the exchange on RabbitMQ by invoking the Exchange.Declare RPC
@@ -354,6 +350,10 @@ class Publisher(object):
         :param str routing_key: The routing key for the message to be published
 
         """
+        if not (self._channel and self._channel.is_open and self._connection and self._connection.is_open):
+            self._LOGGER.warn("channel or connection not available... reconnecting")
+            self.reconnect()
+
         if self._channel.is_open:
             self._channel.basic_publish(self.exchange, routing_key, message, properties=pika.BasicProperties(
                 delivery_mode=2,  # make message persistent
@@ -412,8 +412,7 @@ class Publisher(object):
         """
         self._channel_closing = True
         self.close_channel()
-        if not self._connection_closing:
-            RMQConnectionPool.put_connection(self._url, self._connection)
+        self.close_connection()
         self._connection.ioloop.start()
 
     def stop_connection(self):
