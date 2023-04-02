@@ -2,7 +2,7 @@ import sys
 import pika
 import signal
 import logging
-from connection import RMQConnectionPool
+
 
 
 class Publisher(object):
@@ -94,6 +94,8 @@ class Publisher(object):
         :rtype: pika.SelectConnection
 
         """
+        from connection import RMQConnectionPool
+
         self._connection_closing = False
         self._LOGGER.info('Connecting to %s', self._url)
         connection = RMQConnectionPool.get_connection(self._url)
@@ -401,6 +403,8 @@ class Publisher(object):
         of creating a new connection
 
         """
+        from connection import RMQConnectionPool
+
         self._channel_closing = True
         self.close_channel()
         if not self._connection_closing:
